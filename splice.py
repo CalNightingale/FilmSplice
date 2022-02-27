@@ -3,6 +3,7 @@ from __future__ import print_function
 import pickle
 import os.path
 import io
+import os
 import shutil
 import requests
 from mimetypes import MimeTypes
@@ -90,36 +91,53 @@ class DriveAPI:
                 parentFolder = items[selection_id].get('id')
                 curName = items[selection_id].get('name')
 
+        return parentFolder
 
-    def FileDownload(self, file_id, file_name):
-        request = self.service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
 
-        # Initialise a downloader object to download the file
-        downloader = MediaIoBaseDownload(fh, request, chunksize=204800)
-        done = False
 
-        try:
-            # Download the data in chunks
-            while not done:
-                status, done = downloader.next_chunk()
+    def downloadFilm(self, folder_id):
+        # make dl directory if necessary
+        if not os.path.exists("staging"):
+            os.makedirs("staging")
 
-            fh.seek(0)
+        results = self.service.files().list(q=f"'{folder_id}' in parents",
+                                            spaces="drive",
+                                            fields="files(id, name)").execute()
+        files = results.get('files', [])
 
-            # Write the received data to the file
-            with open(file_name, 'wb') as f:
-                shutil.copyfileobj(fh, f)
+        for file in files:
+            print(f"Downloading {file.get('name')}...")
+            file_id = file.get('id')
+            dl_path = f"staging/{file.get('name')}"
+            print("begin")
+            request = self.service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
 
-            print("File Downloaded")
-            # Return True if file Downloaded successfully
-            return True
-        except:
+            # Initialise a downloader object to download the file
+            downloader = MediaIoBaseDownload(fh, request, chunksize=204800)
+            done = False
+            try:
+                # Download the data in chunks
+                while not done:
+                    status, done = downloader.next_chunk()
 
-            # Return False if something went wrong
-            print("Something went wrong.")
-            return False
+                fh.seek(0)
+
+                # Write the received data to the file
+                with open(file_name, 'wb') as f:
+                    shutil.copyfileobj(fh, f)
+
+                print(f"Downloaded {file_name}")
+                # Return True if file Downloaded successfully
+                return True
+            except:
+
+                # Return False if something went wrong
+                print("Something went wrong.")
+                return False
+
 
 if __name__ == "__main__":
     obj = DriveAPI()
-    obj.findFolder()
-    #obj.FileDownload(f_id, f_name)
+    toSplice = obj.findFolder()
+    obj.downloadFilm(toSplice)
