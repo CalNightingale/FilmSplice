@@ -62,16 +62,33 @@ class DriveAPI:
 
         # request a list of first N files or
         # folders with name and id from the API.
-        #
-        results = self.service.files().list(q="'1z6Igio7OykVw6YQXYDk97rbkeeCiLkb_' in parents",
-                                            spaces="drive",
-                                            fields="files(id, name)").execute()
-        items = results.get('files', [])
 
-        # print a list of files
+        folderPicked = False
+        parentFolder = '1z6Igio7OykVw6YQXYDk97rbkeeCiLkb_' # start with BMO film as parent folder
+        curName = "BMo Film"
+        while not folderPicked:
+            results = self.service.files().list(q=f"'{parentFolder}' in parents and mimeType = 'application/vnd.google-apps.folder'",
+                                                spaces="drive",
+                                                fields="files(id, name)").execute()
+            items = results.get('files', [])
 
-        print("Here's a list of files: \n")
-        print(*items, sep="\n", end="\n\n")
+            if len(items) == 0:
+                # no subfolders! Potentially done, prompt user
+                done = input(f"No subfolders detected! Splice '{curName}' (y/n)? ")
+                if done == 'y':
+                    folderPicked = True
+                else:
+                    # TODO: restart seach process
+                    exit(0)
+
+            else:
+                # print a list of files
+                print("Folders available: \n")
+                for i, item in enumerate(items):
+                    print(f"({i}): {item.get('name')}")
+                selection_id = int(input("Jump to number: "))
+                parentFolder = items[selection_id].get('id')
+                curName = items[selection_id].get('name')
 
 
     def FileDownload(self, file_id, file_name):
@@ -105,7 +122,4 @@ class DriveAPI:
 if __name__ == "__main__":
     obj = DriveAPI()
     obj.findFolder()
-
-    f_id = input("Enter file id: ")
-    f_name = input("Enter file name: ")
-    obj.FileDownload(f_id, f_name)
+    #obj.FileDownload(f_id, f_name)
