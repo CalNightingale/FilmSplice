@@ -11,6 +11,7 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from moviepy.editor import *
 
 class DriveAPI:
     global SCOPES
@@ -100,6 +101,10 @@ class DriveAPI:
         if not os.path.exists("staging"):
             os.makedirs("staging")
 
+        # remove existing files UNCOMMENT WHEN DONE
+        #for file in os.scandir("staging"):
+        #    os.remove(file.path)
+
         results = self.service.files().list(q=f"'{folder_id}' in parents",
                                             spaces="drive",
                                             fields="files(id, name)").execute()
@@ -108,7 +113,7 @@ class DriveAPI:
         for file in files:
             print(f"Downloading {file.get('name')}...")
             file_id = file.get('id')
-            dl_path = f"{os.getcwd()}/staging/{file.get('name')}"
+            dl_path = f"staging/{file.get('name')}"
             print("begin")
             request = self.service.files().get_media(fileId=file_id)
             fh = io.BytesIO()
@@ -123,8 +128,20 @@ class DriveAPI:
             with open(dl_path, 'wb') as f:
                 shutil.copyfileobj(fh, f)
 
+    def spliceFilm(self):
+        # create list of loaded-in clips
+        clips = []
+        for file in os.scandir("staging"):
+            vid = VideoFileClip(file.path)
+            clips.append(vid)
+
+        # concatenate clips and save
+        final = concatenate_videoclips(clips)
+        final.write_videofile("staging/__merged.MP4")
+
 
 if __name__ == "__main__":
     obj = DriveAPI()
-    toSplice = obj.findFolder()
-    obj.downloadFilm(toSplice)
+    #toSplice = obj.findFolder()
+    #obj.downloadFilm(toSplice)
+    obj.spliceFilm()
