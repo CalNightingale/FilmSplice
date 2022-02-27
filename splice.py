@@ -108,33 +108,20 @@ class DriveAPI:
         for file in files:
             print(f"Downloading {file.get('name')}...")
             file_id = file.get('id')
-            dl_path = f"staging/{file.get('name')}"
+            dl_path = f"{os.getcwd()}/staging/{file.get('name')}"
             print("begin")
             request = self.service.files().get_media(fileId=file_id)
             fh = io.BytesIO()
-
-            # Initialise a downloader object to download the file
-            downloader = MediaIoBaseDownload(fh, request, chunksize=204800)
+            downloader = MediaIoBaseDownload(fh, request)
             done = False
-            try:
-                # Download the data in chunks
-                while not done:
-                    status, done = downloader.next_chunk()
+            while done is False:
+                status, done = downloader.next_chunk()
+                print("Download %d%%." % int(status.progress() * 100))
 
-                fh.seek(0)
-
-                # Write the received data to the file
-                with open(file_name, 'wb') as f:
-                    shutil.copyfileobj(fh, f)
-
-                print(f"Downloaded {file_name}")
-                # Return True if file Downloaded successfully
-                return True
-            except:
-
-                # Return False if something went wrong
-                print("Something went wrong.")
-                return False
+            fh.seek(0)
+            # Write the received data to the file
+            with open(dl_path, 'wb') as f:
+                shutil.copyfileobj(fh, f)
 
 
 if __name__ == "__main__":
