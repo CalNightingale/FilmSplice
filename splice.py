@@ -56,19 +56,23 @@ class DriveAPI:
             with open('token.pickle', 'wb') as token:
                 pickle.dump(self.creds, token)
 
+    def findFolder(self):
         # Connect to the API service
         self.service = build('drive', 'v3', credentials=self.creds)
 
         # request a list of first N files or
         # folders with name and id from the API.
-        results = self.service.files().list(
-            pageSize=100, fields="files(id, name)").execute()
+        #
+        results = self.service.files().list(q="'1z6Igio7OykVw6YQXYDk97rbkeeCiLkb_' in parents",
+                                            spaces="drive",
+                                            fields="files(id, name)").execute()
         items = results.get('files', [])
 
         # print a list of files
 
         print("Here's a list of files: \n")
         print(*items, sep="\n", end="\n\n")
+
 
     def FileDownload(self, file_id, file_name):
         request = self.service.files().get_media(fileId=file_id)
@@ -98,43 +102,10 @@ class DriveAPI:
             print("Something went wrong.")
             return False
 
-    def FileUpload(self, filepath):
-
-        # Extract the file name out of the file path
-        name = filepath.split('/')[-1]
-
-        # Find the MimeType of the file
-        mimetype = MimeTypes().guess_type(name)[0]
-
-        # create file metadata
-        file_metadata = {'name': name}
-
-        try:
-            media = MediaFileUpload(filepath, mimetype=mimetype)
-
-            # Create a new file in the Drive storage
-            file = self.service.files().create(
-                body=file_metadata, media_body=media, fields='id').execute()
-
-            print("File Uploaded.")
-
-        except:
-
-            # Raise UploadError if file is not uploaded.
-            raise UploadError("Can't Upload File.")
-
 if __name__ == "__main__":
     obj = DriveAPI()
-    i = int(input("Enter your choice: 1 - Download file, 2- Upload File, 3- Exit.\n"))
+    obj.findFolder()
 
-    if i == 1:
-        f_id = input("Enter file id: ")
-        f_name = input("Enter file name: ")
-        obj.FileDownload(f_id, f_name)
-
-    elif i == 2:
-        f_path = input("Enter full file path: ")
-        obj.FileUpload(f_path)
-
-    else:
-        exit()
+    f_id = input("Enter file id: ")
+    f_name = input("Enter file name: ")
+    obj.FileDownload(f_id, f_name)
