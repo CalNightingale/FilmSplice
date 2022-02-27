@@ -3,6 +3,7 @@ from __future__ import print_function
 import pickle
 import os.path
 import io
+import os
 import shutil
 import requests
 from mimetypes import MimeTypes
@@ -90,36 +91,40 @@ class DriveAPI:
                 parentFolder = items[selection_id].get('id')
                 curName = items[selection_id].get('name')
 
+        return parentFolder
 
-    def FileDownload(self, file_id, file_name):
-        request = self.service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
 
-        # Initialise a downloader object to download the file
-        downloader = MediaIoBaseDownload(fh, request, chunksize=204800)
-        done = False
 
-        try:
-            # Download the data in chunks
-            while not done:
+    def downloadFilm(self, folder_id):
+        # make dl directory if necessary
+        if not os.path.exists("staging"):
+            os.makedirs("staging")
+
+        results = self.service.files().list(q=f"'{folder_id}' in parents",
+                                            spaces="drive",
+                                            fields="files(id, name)").execute()
+        files = results.get('files', [])
+
+        for file in files:
+            print(f"Downloading {file.get('name')}...")
+            file_id = file.get('id')
+            dl_path = f"{os.getcwd()}/staging/{file.get('name')}"
+            print("begin")
+            request = self.service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
                 status, done = downloader.next_chunk()
+                print("Download %d%%." % int(status.progress() * 100))
 
             fh.seek(0)
-
             # Write the received data to the file
-            with open(file_name, 'wb') as f:
+            with open(dl_path, 'wb') as f:
                 shutil.copyfileobj(fh, f)
 
-            print("File Downloaded")
-            # Return True if file Downloaded successfully
-            return True
-        except:
-
-            # Return False if something went wrong
-            print("Something went wrong.")
-            return False
 
 if __name__ == "__main__":
     obj = DriveAPI()
-    obj.findFolder()
-    #obj.FileDownload(f_id, f_name)
+    toSplice = obj.findFolder()
+    obj.downloadFilm(toSplice)
