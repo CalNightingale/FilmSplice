@@ -4,20 +4,47 @@ import pickle
 import os.path
 import io
 import os
+import random
 import shutil
 import requests
+import http.client
+import httplib2
 from mimetypes import MimeTypes
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from googleapiclient.errors import HttpError
 from moviepy.editor import *
+
+################################################################################
+# YOUTUBE STUFF
+# Explicitly tell the underlying HTTP transport library not to retry, since
+# we are handling retry logic ourselves.
+
+httplib2.RETRIES = 1
+
+# Maximum number of times to retry before giving up.
+MAX_RETRIES = 10
+
+# Always retry when these exceptions are raised.
+RETRIABLE_EXCEPTIONS = (httplib2.HttpLib2Error, IOError, http.client.NotConnected,
+  http.client.IncompleteRead, http.client.ImproperConnectionState,
+  http.client.CannotSendRequest, http.client.CannotSendHeader,
+  http.client.ResponseNotReady, http.client.BadStatusLine)
+
+# Always retry when an apiclient.errors.HttpError with one of these status
+# codes is raised.
+RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
+################################################################################
+
 
 class DriveAPI:
     global SCOPES
 
     # Define the scopes
-    SCOPES = ['https://www.googleapis.com/auth/drive']
+    SCOPES = ['https://www.googleapis.com/auth/drive',
+              'https://www.googleapis.com/auth/youtube']
 
     def __init__(self):
 
@@ -95,7 +122,6 @@ class DriveAPI:
         return parentFolder
 
 
-
     def downloadFilm(self, folder_id):
         # make dl directory if necessary
         if not os.path.exists("staging"):
@@ -139,9 +165,70 @@ class DriveAPI:
         final = concatenate_videoclips(clips)
         final.write_videofile("staging/__merged.MP4")
 
+    def initialize_upload(self, name="tempTitle"):
+        file = "staging/__merged.MP4"
+        if not os.path.exists(file):
+            exit("Missing __merged.MP4 in staging/")
+
+        body=dict(
+            snippet=dict(
+                title=name,
+                description="Filmspliced!",
+                tags=None
+            ),
+            status=dict(
+                privacyStatus='unlisted'
+            )
+        )
+
+        # Connect to the API service
+        self.service = build('youtube', 'v3', credentials=self.creds)
+        # Call the API's videos.insert method to create and upload the video.
+        insert_request = self.service.videos().insert(part=",".join(body.keys()),
+                                                      body=body,
+                                                      media_body=MediaFileUpload(file, chunksize=-1, resumable=True))
+
+        self.resumable_upload(insert_request)
+
+    # FROM YOUTUBE API DOCUMENTATION
+    # This method implements an exponential backoff strategy to resume a failed upload.
+    def resumable_upload(self, insert_request):
+        response = None
+        error = None
+        retry = 0
+        while response is None:
+            try:
+                print("Uploading file...")
+                status, response = insert_request.next_chunk()
+                if response is not None:
+                    if 'id' in response:
+                        print(f"Video id '{response['id']}' was successfully uploaded.")
+                    else:
+                        exit("The upload failed with an unexpected response: %s" % response)
+            except HttpError as e:
+                if e.resp.status in RETRIABLE_STATUS_CODES:
+                    error = "A retriable HTTP error %d occurred:\n%s" % (e.resp.status,
+                                                                         e.content)
+                else:
+                    raise
+            except RETRIABLE_EXCEPTIONS as e:
+                error = "A retriable error occurred: %s" % e
+
+            if error is not None:
+                print(error)
+                retry += 1
+            if retry > MAX_RETRIES:
+                exit("No longer attempting to retry.")
+
+            max_sleep = 2 ** retry
+            sleep_seconds = random.random() * max_sleep
+            print(f"Sleeping {sleep_seconds} seconds and then retrying...")
+            time.sleep(sleep_seconds)
+
 
 if __name__ == "__main__":
     obj = DriveAPI()
     #toSplice = obj.findFolder()
     #obj.downloadFilm(toSplice)
-    obj.spliceFilm()
+    #obj.spliceFilm()
+    obj.initialize_upload()
