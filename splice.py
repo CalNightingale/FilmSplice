@@ -119,7 +119,7 @@ class DriveAPI:
                 parentFolder = items[selection_id].get('id')
                 curName = items[selection_id].get('name')
 
-        return parentFolder
+        return parentFolder, curName
 
 
     def downloadFilm(self, folder_id):
@@ -127,9 +127,9 @@ class DriveAPI:
         if not os.path.exists("staging"):
             os.makedirs("staging")
 
-        # remove existing files UNCOMMENT WHEN DONE
-        #for file in os.scandir("staging"):
-        #    os.remove(file.path)
+        # remove existing files
+        for file in os.scandir("staging"):
+            os.remove(file.path)
 
         results = self.service.files().list(q=f"'{folder_id}' in parents",
                                             spaces="drive",
@@ -228,7 +228,7 @@ class DriveAPI:
 
 if __name__ == "__main__":
     obj = DriveAPI()
-    #toSplice = obj.findFolder()
-    #obj.downloadFilm(toSplice)
-    #obj.spliceFilm()
-    obj.initialize_upload()
+    toSplice, name = obj.findFolder()
+    obj.downloadFilm(toSplice)
+    obj.spliceFilm()
+    obj.initialize_upload(name=name)
