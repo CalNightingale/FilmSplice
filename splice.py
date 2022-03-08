@@ -180,7 +180,8 @@ class DriveAPI:
                 tags=None
             ),
             status=dict(
-                privacyStatus='unlisted'
+                privacyStatus='unlisted',
+                selfDeclaredMadeForKids=False
             )
         )
 
