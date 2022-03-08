@@ -168,15 +168,50 @@ class DriveAPI:
         final = concatenate_videoclips(clips)
         final.write_videofile("staging/__merged.MP4")
 
-    def initialize_upload(self, name="tempTitle"):
+
+    def format_desc(self):
+        print("Generating chapters...")
+        # get names and durations
+        clipNames = [file.name for file in os.scandir("staging")]
+        clipNames.sort()
+        durations = []
+        for clipName in clipNames:
+            vid = VideoFileClip(f"staging/{clipName}")
+            durations.append(vid.duration)
+            del vid
+
+        # generate formatted string
+        desc = "Filmspliced! Clips:\n\n"
+        curTime = 0
+        for name, dur in zip(clipNames, durations):
+            if name == "__merged.MP4":
+                # skip merged if it exists
+                continue
+            # format time for use in YouTube auto-chapter generation
+            timeStr = time.strftime('%H:%M:%S', time.gmtime(curTime))
+            clipString = f"{timeStr} {name}\n"
+            desc += clipString
+            # increment time and do again
+            curTime += dur
+        print("Chapters generated")
+        return desc
+
+
+    def initialize_upload(self, name="tempTitle", chapters=True):
         file = "staging/__merged.MP4"
         if not os.path.exists(file):
             exit("Missing __merged.MP4 in staging/")
 
+        # format description
+        if chapters:
+            desc = self.format_desc()
+        else:
+            desc = "Filmspliced!"
+
         body=dict(
             snippet=dict(
                 title=name,
-                description="Filmspliced!",
+                description=desc,
                 tags=None
             ),
             status=dict(
@@ -229,6 +264,11 @@ class DriveAPI:
             print(f"Sleeping {sleep_seconds} seconds and then retrying...")
             time.sleep(sleep_seconds)
 
+def main():
+    toSplice, name = obj.findFolder()
+    obj.downloadFilm(toSplice)
+    obj.spliceFilm()
+    obj.initialize_upload(name=name)
 
 if __name__ == "__main__":
     obj = DriveAPI()
@@ -241,7 +281,8 @@ if __name__ == "__main__":
             if ans == 'y':
                 obj.initialize_upload()
             else:
-                exit(0)
+                # start over
+                main()
         else:
             # splicing not done
             ans = input("files in staging. Resume merge?(y/n) ")
@@ -249,10 +290,8 @@ if __name__ == "__main__":
                 obj.spliceFilm()
                 obj.initialize_upload()
             else:
-                exit(0)
+                # start over
+                main()
     else:
         # no existing work
-        toSplice, name = obj.findFolder()
-        obj.downloadFilm(toSplice)
-        obj.spliceFilm()
-        obj.initialize_upload(name=name)
+        main()
