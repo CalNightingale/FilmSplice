@@ -157,9 +157,11 @@ class DriveAPI:
 
     def spliceFilm(self):
         # create list of loaded-in clips
+        clipNames = [file.name for file in os.scandir("staging")]
+        clipNames.sort()
         clips = []
-        for file in os.scandir("staging"):
-            vid = VideoFileClip(file.path)
+        for clipName in clipNames:
+            vid = VideoFileClip(f"staging/{clipName}")
             clips.append(vid)
 
         # concatenate clips and save
@@ -229,7 +231,27 @@ class DriveAPI:
 
 if __name__ == "__main__":
     obj = DriveAPI()
-    toSplice, name = obj.findFolder()
-    obj.downloadFilm(toSplice)
-    obj.spliceFilm()
-    obj.initialize_upload(name=name)
+    existingFiles = [file.name for file in os.scandir("staging")]
+    if len(existingFiles) > 0:
+        # existing work in staging
+        if "__merged.MP4" in existingFiles:
+            # splicing done already
+            ans = input("previous merge detected. Resume upload?(y/n) ")
+            if ans == 'y':
+                obj.initialize_upload()
+            else:
+                exit(0)
+        else:
+            # splicing not done
+            ans = input("files in staging. Resume merge?(y/n) ")
+            if ans == 'y':
+                obj.spliceFilm()
+                obj.initialize_upload()
+            else:
+                exit(0)
+    else:
+        # no existing work
+        toSplice, name = obj.findFolder()
+        obj.downloadFilm(toSplice)
+        obj.spliceFilm()
+        obj.initialize_upload(name=name)
