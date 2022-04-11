@@ -18,6 +18,8 @@ from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 from googleapiclient.errors import HttpError
 from moviepy.editor import *
 
+from simple_term_menu import TerminalMenu
+
 ################################################################################
 # YOUTUBE STUFF
 # Explicitly tell the underlying HTTP transport library not to retry, since
@@ -270,28 +272,29 @@ def main():
     obj.spliceFilm()
     obj.initialize_upload(name=name)
 
+def updateFunction():
+    print("test")
+
 if __name__ == "__main__":
-    obj = DriveAPI()
+    options = ["new splice", "resume splice", "retry upload"]
+    terminal_menu = TerminalMenu(options)
+    user_selection = terminal_menu.show()
+
     existingFiles = [file.name for file in os.scandir("staging")]
-    if len(existingFiles) > 0:
-        # existing work in staging
-        if "__merged.MP4" in existingFiles:
-            # splicing done already
-            ans = input("previous merge detected. Resume upload?(y/n) ")
-            if ans == 'y':
-                obj.initialize_upload()
-            else:
-                # start over
-                main()
-        else:
-            # splicing not done
-            ans = input("files in staging. Resume merge?(y/n) ")
-            if ans == 'y':
-                obj.spliceFilm()
-                obj.initialize_upload()
-            else:
-                # start over
-                main()
-    else:
-        # no existing work
+    obj = DriveAPI()
+    if user_selection == 0:
+        # new splice
         main()
+    elif user_selection == 1:
+        # resume splice
+        if len(existingFiles) == 0:
+            print("No files found in staging! Cannot resume splice")
+            exit()
+        obj.spliceFilm()
+        obj.initialize_upload()
+    elif user_selection == 2:
+        # resume upload
+        if "__merged.MP4" not in existingFiles:
+            print("Missing '__merged.MP4' in staging! Cannot resume upload")
+            exit()
+        obj.initialize_upload()
