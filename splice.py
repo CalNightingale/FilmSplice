@@ -261,19 +261,25 @@ class DriveAPI:
             if retry > MAX_RETRIES:
                 exit("No longer attempting to retry.")
 
-            max_sleep = 2 ** retry
-            sleep_seconds = random.random() * max_sleep
-            print(f"Sleeping {sleep_seconds} seconds and then retrying...")
-            time.sleep(sleep_seconds)
+            if not response:
+                # sleep and retry if unsuccessful
+                max_sleep = 2 ** retry
+                sleep_seconds = random.random() * max_sleep
+                print(f"Sleeping {sleep_seconds} seconds and then retrying...")
+                time.sleep(sleep_seconds)
+
+        if 'id' in response:
+            # success; sleep till processed and notify slack
+            self.sleep_till_processed(response['id'])
+
+    def sleep_till_processed(self, id):
+
 
 def main():
     toSplice, name = obj.findFolder()
     obj.downloadFilm(toSplice)
     obj.spliceFilm()
     obj.initialize_upload(name=name)
-
-def updateFunction():
-    print("test")
 
 if __name__ == "__main__":
     options = ["new splice", "resume splice", "retry upload"]
