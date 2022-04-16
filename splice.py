@@ -52,6 +52,17 @@ class DriveAPI:
 
     def __init__(self):
 
+        self.slack_hook = None
+        self.parent_folder = None
+        # grab variables from secrets file
+        if not os.path.exists('secrets.json'):
+            exit("Missing 'secrets.json'")
+
+        with open('secrets.json', 'r') as secrets_file:
+            secrets_data = json.load(secrets_file)
+            self.slack_hook = secrets_data.get('slack_hook')
+            self.parent_folder = secrets_data.get('parent_folder')
+
         # Variable self.creds will
         # store the user access token.
         # If no valid token found
@@ -97,7 +108,7 @@ class DriveAPI:
         # folders with name and id from the API.
 
         folderPicked = False
-        parentFolder = '1z6Igio7OykVw6YQXYDk97rbkeeCiLkb_' # start with BMO film as parent folder
+        parentFolder = self.parent_folder # start with master folder from secrets.json
         curName = "BMo Film"
         while not folderPicked:
             results = self.service.files().list(q=f"'{parentFolder}' in parents and mimeType = 'application/vnd.google-apps.folder'",
@@ -293,12 +304,9 @@ class DriveAPI:
 
 
     def send_success_message(self, vid_id, name):
-        secrets_file = open("secrets.json")
-        data = json.load(secrets_file)
-        url = data.get("slack_hook")
         message = f"Video '{name}' has been filmspliced! Dap up www.youtube.com/watch?v={vid_id}"
         payload = {'text': message}
-        x = requests.post(url, json = payload)
+        x = requests.post(self.slack_hook, json = payload)
 
 
 def main():
