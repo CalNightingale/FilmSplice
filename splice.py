@@ -16,6 +16,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 from googleapiclient.errors import HttpError
+from google.auth.exceptions import RefreshError
 from moviepy.editor import *
 
 from simple_term_menu import TerminalMenu
@@ -229,11 +230,11 @@ class DriveAPI:
                                                       body=body,
                                                       media_body=MediaFileUpload(file, chunksize=-1, resumable=True))
 
-        self.resumable_upload(insert_request)
+        self.resumable_upload(insert_request, name)
 
     # FROM YOUTUBE API DOCUMENTATION
     # This method implements an exponential backoff strategy to resume a failed upload.
-    def resumable_upload(self, insert_request):
+    def resumable_upload(self, insert_request, name):
         response = None
         error = None
         retry = 0
@@ -270,9 +271,32 @@ class DriveAPI:
 
         if 'id' in response:
             # success; sleep till processed and notify slack
-            self.sleep_till_processed(response['id'])
+            self.sleep_till_processed(response['id'], name)
 
-    def sleep_till_processed(self, id):
+
+    def sleep_till_processed(self, vid_id, name):
+        max_attempts = 4
+        # Call the API's videos.insert method to create and upload the video.
+        request = self.service.videos().list(part="processingDetails",id=str(vid_id))
+        status = None
+        print("Checking processing status...")
+        for attempt in range(max_attempts):
+            time.sleep(5*60) # sleep 5 mins
+            response = request.execute()
+            status = response['items'][0]['processingDetails']['processingStatus']
+            if status == 'processing':
+                print("Still processing...")
+            elif status == 'succeeded':
+                print("Done! Sending message to slack")
+                self.send_success_message(vid_id, name)
+                break
+
+
+    def send_success_message(self, vid_id, name):
+        url = 'https://hooks.slack.com/services/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'
+        message = f"Video '{name}' has been filmspliced! Dap up www.youtube.com/watch?v={vid_id}"
+        payload = {'text': message}
+        x = requests.post(url, json = payload)
 
 
 def main():
@@ -287,7 +311,13 @@ if __name__ == "__main__":
     user_selection = terminal_menu.show()
 
     existingFiles = [file.name for file in os.scandir("staging")]
-    obj = DriveAPI()
+    try:
+        obj = DriveAPI()
+    except RefreshError:
+        # if token expired; remove it and retry
+        os.remove("token.pickle")
+        obj = DriveAPI()
+
     if user_selection == 0:
         # new splice
         main()
