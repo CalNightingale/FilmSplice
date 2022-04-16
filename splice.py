@@ -1,10 +1,10 @@
-# import the required libraries
 from __future__ import print_function
 import pickle
 import os.path
 import io
 import os
 import time
+import json
 import random
 import shutil
 import requests
@@ -293,7 +293,9 @@ class DriveAPI:
 
 
     def send_success_message(self, vid_id, name):
-        url = 'https://hooks.slack.com/services/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'
+        secrets_file = open("secrets.json")
+        data = json.load(secrets_file)
+        url = data.get("slack_hook")
         message = f"Video '{name}' has been filmspliced! Dap up www.youtube.com/watch?v={vid_id}"
         payload = {'text': message}
         x = requests.post(url, json = payload)
