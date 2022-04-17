@@ -1,0 +1,8 @@
+# secrets
+secrets.json
+credentials.json
+token.pickle
+# folders and venvs
+staging
+spliceenv
+__pycache__
