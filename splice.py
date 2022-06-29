@@ -17,9 +17,10 @@ from google.auth.transport.requests import Request
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
-from moviepy.editor import *
+from moviepy.editor import VideoFileClip, concatenate_videoclips
 
 from simple_term_menu import TerminalMenu
+import concurrent.futures
 
 ################################################################################
 # YOUTUBE STUFF
@@ -41,6 +42,9 @@ RETRIABLE_EXCEPTIONS = (httplib2.HttpLib2Error, IOError, http.client.NotConnecte
 # codes is raised.
 RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
 ################################################################################
+
+# How many concurrent threads to check for processing videos
+MAX_THREADS = 5
 
 
 class DriveAPI:
@@ -109,7 +113,7 @@ class DriveAPI:
 
         folderPicked = False
         parentFolder = self.parent_folder # start with master folder from secrets.json
-        curName = "BMo Film"
+        curName = "2022 Film"
         while not folderPicked:
             results = self.service.files().list(q=f"'{parentFolder}' in parents and mimeType = 'application/vnd.google-apps.folder'",
                                                 spaces="drive",
@@ -169,12 +173,17 @@ class DriveAPI:
             with open(dl_path, 'wb') as f:
                 shutil.copyfileobj(fh, f)
 
+    def get_clip_names(self):
+        clipNames = [file.name for file in os.scandir("staging") if '.DS_Store' not in file.name]
+        clipNames.sort()
+        return clipNames
+
     def spliceFilm(self):
         # create list of loaded-in clips
-        clipNames = [file.name for file in os.scandir("staging")]
-        clipNames.sort()
+        clipNames = self.get_clip_names()
         clips = []
         for clipName in clipNames:
+            print(f"Processing {clipName}")
             vid = VideoFileClip(f"staging/{clipName}")
             clips.append(vid)
 
@@ -186,10 +195,11 @@ class DriveAPI:
     def format_desc(self):
         print("Generating chapters...")
         # get names and durations
-        clipNames = [file.name for file in os.scandir("staging")]
+        clipNames = self.get_clip_names()
         clipNames.sort()
         durations = []
         for clipName in clipNames:
+            print(f"Formatting {clipName}")
             vid = VideoFileClip(f"staging/{clipName}")
             durations.append(vid.duration)
             del vid
@@ -286,13 +296,13 @@ class DriveAPI:
 
 
     def sleep_till_processed(self, vid_id, name):
-        max_attempts = 4
+        max_attempts = 10000
         # Call the API's videos.insert method to create and upload the video.
         request = self.service.videos().list(part="processingDetails",id=str(vid_id))
         status = None
         print("Checking processing status...")
         for attempt in range(max_attempts):
-            time.sleep(5*60) # sleep 5 mins
+            time.sleep(60) # sleep 5 mins
             response = request.execute()
             status = response['items'][0]['processingDetails']['processingStatus']
             if status == 'processing':
@@ -303,11 +313,58 @@ class DriveAPI:
                 break
 
 
+    def get_uploads_playlist_id(self):
+
+        channels_response = self.service.channels().list(
+            mine=True,
+            part='contentDetails'
+        ).execute()
+
+        # Only functions with single channels - will only return the first channels results
+        for response in channels_response.get('items'):
+            return response['contentDetails']['relatedPlaylists']['uploads']
+
+    def get_processing_video_ids(self,uploads_playlist_id):
+        upload_playlist_responses = self.service.playlistItems().list(part="snippet", playlistId=uploads_playlist_id).execute()
+
+        snippet_ids_and_titles = [
+            (
+                response['snippet']['resourceId']['videoId'],
+                response['snippet']['title']
+            )
+            for response in upload_playlist_responses.get('items')]
+        return [(video_id, title) for video_id, title in snippet_ids_and_titles if self.is_processing(video_id)]
+
+    def is_processing(self, video_id):
+        processing_details = self.service.videos().list(part="processingDetails",id=str(video_id)).execute().get('items')
+        for processing_detail in processing_details:
+            return processing_detail['processingDetails']['processingStatus'] == 'processing'
+
+
+    def monitor_processing(self, processing_video_ids):
+        # worker_count = min(len(processing_video_ids), MAX_THREADS)
+        # print(processing_video_ids)
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
+        #     executor.map(self.sleep_till_processed, processing_video_ids)
+        for video_id, video_name in processing_video_ids:
+            self.sleep_till_processed(video_id, video_name)
+
     def send_success_message(self, vid_id, name):
         message = f"Video '{name}' has been filmspliced! Dap up www.youtube.com/watch?v={vid_id}"
         payload = {'text': message}
         x = requests.post(self.slack_hook, json = payload)
 
+    def resume_monitoring(self):
+        #TODO: Separate this from the google drive calls
+        self.service = build('youtube', 'v3', credentials=self.creds)
+        uploads_playlist_id = self.get_uploads_playlist_id()
+        if not uploads_playlist_id:
+            print("No uploads playlist found for this user")
+            exit(1)
+        processing_video_ids = self.get_processing_video_ids(uploads_playlist_id)
+        print(f"Monitoring processing on these videos {processing_video_ids}")
+        self.monitor_processing(processing_video_ids)
+        print("Done!")
 
 def main():
     toSplice, name = obj.findFolder()
@@ -316,11 +373,11 @@ def main():
     obj.initialize_upload(name=name)
 
 if __name__ == "__main__":
-    options = ["new splice", "resume splice", "retry upload"]
+    options = ["new splice", "resume splice", "retry upload", "resume monitoring processing"]
     terminal_menu = TerminalMenu(options)
     user_selection = terminal_menu.show()
 
-    existingFiles = [file.name for file in os.scandir("staging")]
+    existingFiles = [file.name for file in os.scandir("staging")] if os.path.exists("staging") else []
     try:
         obj = DriveAPI()
     except RefreshError:
@@ -333,14 +390,19 @@ if __name__ == "__main__":
         main()
     elif user_selection == 1:
         # resume splice
+        name = input("""What is the name of the video to be uploaded?\n""")
         if len(existingFiles) == 0:
             print("No files found in staging! Cannot resume splice")
             exit()
         obj.spliceFilm()
-        obj.initialize_upload()
+        obj.initialize_upload(name=name)
     elif user_selection == 2:
         # resume upload
         if "__merged.MP4" not in existingFiles:
             print("Missing '__merged.MP4' in staging! Cannot resume upload")
             exit()
-        obj.initialize_upload()
+        name = input("What is the name of the video to be uploaded?\n")
+        obj.initialize_upload(name=name)
+    elif user_selection == 3:
+        # resume monitoring processing
+        obj.resume_monitoring()
