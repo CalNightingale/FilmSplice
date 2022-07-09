@@ -30,3 +30,4 @@ uritemplate==4.1.1
 urllib3==1.26.8
 urwid==2.1.2
 urwid-readline==0.13
+whiptail-dialogs==0.3.2
