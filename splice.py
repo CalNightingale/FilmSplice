@@ -20,6 +20,8 @@ from google.auth.exceptions import RefreshError
 from moviepy.editor import *
 
 from simple_term_menu import TerminalMenu
+from pyfzf.pyfzf import FzfPrompt
+import whiptail as wt
 
 ################################################################################
 # YOUTUBE STUFF
@@ -41,7 +43,7 @@ RETRIABLE_EXCEPTIONS = (httplib2.HttpLib2Error, IOError, http.client.NotConnecte
 # codes is raised.
 RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
 ################################################################################
-
+FZF_ARGS = '--margin 1,7 --border --tiebreak=begin --color fg:252,bg:237,hl:11,fg+:238,bg+:139,hl+:0 --color info:108,prompt:109,spinner:108,pointer:168,marker:168'
 
 class DriveAPI:
     global SCOPES
@@ -100,26 +102,31 @@ class DriveAPI:
             with open('token.pickle', 'wb') as token:
                 pickle.dump(self.creds, token)
 
+        # create fzfprompt object for later use in menus
+        self.fzf = FzfPrompt()
+
     def findFolder(self):
         # Connect to the API service
         self.service = build('drive', 'v3', credentials=self.creds)
 
-        # request a list of first N files or
-        # folders with name and id from the API.
-
         folderPicked = False
         parentFolder = self.parent_folder # start with master folder from secrets.json
-        curName = "BMo Film"
+        curName = "TOP LEVEL FOLDER"
         while not folderPicked:
             results = self.service.files().list(q=f"'{parentFolder}' in parents and mimeType = 'application/vnd.google-apps.folder'",
                                                 spaces="drive",
                                                 fields="files(id, name)").execute()
             items = results.get('files', [])
+            names_to_ids = dict()
+            for item in items:
+                names_to_ids[item.get('name')] = item.get('id')
 
             if len(items) == 0:
                 # no subfolders! Potentially done, prompt user
-                done = input(f"No subfolders detected! Splice '{curName}' (y/n)? ")
-                if done == 'y':
+                donemsg = f"No subfolders detected! Splice '{curName}?'"
+                # for reasons unknown this returns the opposite of what the user clicked
+                done = wt.Whiptail(title="Confirm Splice", height=20, width=60).yesno(donemsg,default='no')
+                if not done:
                     folderPicked = True
                 else:
                     # TODO: restart seach process
@@ -127,12 +134,9 @@ class DriveAPI:
 
             else:
                 # print a list of files
-                print("Folders available: \n")
-                for i, item in enumerate(items):
-                    print(f"({i}): {item.get('name')}")
-                selection_id = int(input("Jump to number: "))
-                parentFolder = items[selection_id].get('id')
-                curName = items[selection_id].get('name')
+                selection_name = self.fzf.prompt(names_to_ids.keys(), FZF_ARGS)[0]
+                parentFolder = names_to_ids.get(selection_name)
+                curName = selection_name
 
         return parentFolder, curName
 
@@ -316,11 +320,6 @@ def main():
     obj.initialize_upload(name=name)
 
 if __name__ == "__main__":
-    options = ["new splice", "resume splice", "retry upload"]
-    terminal_menu = TerminalMenu(options)
-    user_selection = terminal_menu.show()
-
-    existingFiles = [file.name for file in os.scandir("staging")]
     try:
         obj = DriveAPI()
     except RefreshError:
@@ -328,17 +327,20 @@ if __name__ == "__main__":
         os.remove("token.pickle")
         obj = DriveAPI()
 
-    if user_selection == 0:
+    existingFiles = [file.name for file in os.scandir("staging")]
+    options = ["new splice", "resume splice", "retry upload"]
+    user_selection = obj.fzf.prompt(options)[0]
+    if user_selection == "new splice":
         # new splice
         main()
-    elif user_selection == 1:
+    elif user_selection == "resume splice":
         # resume splice
         if len(existingFiles) == 0:
             print("No files found in staging! Cannot resume splice")
             exit()
         obj.spliceFilm()
         obj.initialize_upload()
-    elif user_selection == 2:
+    elif user_selection == "retry upload":
         # resume upload
         if "__merged.MP4" not in existingFiles:
             print("Missing '__merged.MP4' in staging! Cannot resume upload")
