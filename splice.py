@@ -312,9 +312,17 @@ class DriveAPI:
         payload = {'text': message}
         x = requests.post(self.slack_hook, json = payload)
 
+    def prompt_name(self, folderName):
+        res = wt.Whiptail(title="Name Video", height=20, width=60).inputbox(msg="Enter video title",default=folderName)
+        # if cancelled; exit
+        if res[1]:
+            sys.exit(0)
+        return res[0]
+
 
 def main():
-    toSplice, name = obj.findFolder()
+    toSplice, folderName = obj.findFolder()
+    name = obj.prompt_name(folderName)
     obj.downloadFilm(toSplice)
     obj.spliceFilm()
     obj.initialize_upload(name=name)
