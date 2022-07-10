@@ -34,36 +34,46 @@ httplib2.RETRIES = 1
 MAX_RETRIES = 10
 
 # Always retry when these exceptions are raised.
-RETRIABLE_EXCEPTIONS = (httplib2.HttpLib2Error, IOError, http.client.NotConnected,
-  http.client.IncompleteRead, http.client.ImproperConnectionState,
-  http.client.CannotSendRequest, http.client.CannotSendHeader,
-  http.client.ResponseNotReady, http.client.BadStatusLine)
+RETRIABLE_EXCEPTIONS = (
+    httplib2.HttpLib2Error,
+    IOError,
+    http.client.NotConnected,
+    http.client.IncompleteRead,
+    http.client.ImproperConnectionState,
+    http.client.CannotSendRequest,
+    http.client.CannotSendHeader,
+    http.client.ResponseNotReady,
+    http.client.BadStatusLine,
+)
 
 # Always retry when an apiclient.errors.HttpError with one of these status
 # codes is raised.
 RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
 ################################################################################
-FZF_ARGS = '--margin 1,7 --border --tiebreak=begin --color fg:252,bg:237,hl:11,fg+:238,bg+:139,hl+:0 --color info:108,prompt:109,spinner:108,pointer:168,marker:168'
+FZF_ARGS = "--margin 1,7 --border --tiebreak=begin --color fg:252,bg:237,hl:11,fg+:238,bg+:139,hl+:0 --color info:108,prompt:109,spinner:108,pointer:168,marker:168"
+
 
 class DriveAPI:
     global SCOPES
 
     # Define the scopes
-    SCOPES = ['https://www.googleapis.com/auth/drive',
-              'https://www.googleapis.com/auth/youtube']
+    SCOPES = [
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/youtube",
+    ]
 
     def __init__(self):
 
         self.slack_hook = None
         self.parent_folder = None
         # grab variables from secrets file
-        if not os.path.exists('secrets.json'):
+        if not os.path.exists("secrets.json"):
             exit("Missing 'secrets.json'")
 
-        with open('secrets.json', 'r') as secrets_file:
+        with open("secrets.json", "r") as secrets_file:
             secrets_data = json.load(secrets_file)
-            self.slack_hook = secrets_data.get('slack_hook')
-            self.parent_folder = secrets_data.get('parent_folder')
+            self.slack_hook = secrets_data.get("slack_hook")
+            self.parent_folder = secrets_data.get("parent_folder")
 
         # Variable self.creds will
         # store the user access token.
@@ -77,11 +87,11 @@ class DriveAPI:
         # flow completes for the first time.
 
         # Check if file token.pickle exists
-        if os.path.exists('token.pickle'):
+        if os.path.exists("token.pickle"):
 
             # Read the token from the file and
             # store it in the variable self.creds
-            with open('token.pickle', 'rb') as token:
+            with open("token.pickle", "rb") as token:
                 self.creds = pickle.load(token)
 
         # If no valid credentials are available,
@@ -94,12 +104,13 @@ class DriveAPI:
                 self.creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', SCOPES)
+                    "credentials.json", SCOPES
+                )
                 self.creds = flow.run_local_server(port=0)
 
             # Save the access token in token.pickle
             # file for future usage
-            with open('token.pickle', 'wb') as token:
+            with open("token.pickle", "wb") as token:
                 pickle.dump(self.creds, token)
 
         # create fzfprompt object for later use in menus
@@ -107,25 +118,33 @@ class DriveAPI:
 
     def findFolder(self):
         # Connect to the API service
-        self.service = build('drive', 'v3', credentials=self.creds)
+        self.service = build("drive", "v3", credentials=self.creds)
 
         folderPicked = False
-        parentFolder = self.parent_folder # start with master folder from secrets.json
+        parentFolder = self.parent_folder  # start with master folder from secrets.json
         curName = "TOP LEVEL FOLDER"
         while not folderPicked:
-            results = self.service.files().list(q=f"'{parentFolder}' in parents and mimeType = 'application/vnd.google-apps.folder'",
-                                                spaces="drive",
-                                                fields="files(id, name)").execute()
-            items = results.get('files', [])
+            results = (
+                self.service.files()
+                .list(
+                    q=f"'{parentFolder}' in parents and mimeType = 'application/vnd.google-apps.folder'",
+                    spaces="drive",
+                    fields="files(id, name)",
+                )
+                .execute()
+            )
+            items = results.get("files", [])
             names_to_ids = dict()
             for item in items:
-                names_to_ids[item.get('name')] = item.get('id')
+                names_to_ids[item.get("name")] = item.get("id")
 
             if len(items) == 0:
                 # no subfolders! Potentially done, prompt user
                 donemsg = f"No subfolders detected! Splice '{curName}?'"
                 # for reasons unknown this returns the opposite of what the user clicked
-                done = wt.Whiptail(title="Confirm Splice", height=20, width=60).yesno(donemsg,default='no')
+                done = wt.Whiptail(title="Confirm Splice", height=20, width=60).yesno(
+                    donemsg, default="no"
+                )
                 if not done:
                     folderPicked = True
                 else:
@@ -140,7 +159,6 @@ class DriveAPI:
 
         return parentFolder, curName
 
-
     def downloadFilm(self, folder_id):
         # make dl directory if necessary
         if not os.path.exists("staging"):
@@ -150,14 +168,19 @@ class DriveAPI:
         for file in os.scandir("staging"):
             os.remove(file.path)
 
-        results = self.service.files().list(q=f"'{folder_id}' in parents",
-                                            spaces="drive",
-                                            fields="files(id, name)").execute()
-        files = results.get('files', [])
+        self.service = build("drive", "v3", credentials=self.creds)
+        results = (
+            self.service.files()
+            .list(
+                q=f"'{folder_id}' in parents", spaces="drive", fields="files(id, name)"
+            )
+            .execute()
+        )
+        files = results.get("files", [])
 
         for file in files:
             print(f"Downloading {file.get('name')}...")
-            file_id = file.get('id')
+            file_id = file.get("id")
             dl_path = f"staging/{file.get('name')}"
             print("begin")
             request = self.service.files().get_media(fileId=file_id)
@@ -170,7 +193,7 @@ class DriveAPI:
 
             fh.seek(0)
             # Write the received data to the file
-            with open(dl_path, 'wb') as f:
+            with open(dl_path, "wb") as f:
                 shutil.copyfileobj(fh, f)
 
     def spliceFilm(self):
@@ -185,7 +208,6 @@ class DriveAPI:
         # concatenate clips and save
         final = concatenate_videoclips(clips)
         final.write_videofile("staging/__merged.MP4")
-
 
     def format_desc(self):
         print("Generating chapters...")
@@ -206,7 +228,7 @@ class DriveAPI:
                 # skip merged if it exists
                 continue
             # format time for use in YouTube auto-chapter generation
-            timeStr = time.strftime('%H:%M:%S', time.gmtime(curTime))
+            timeStr = time.strftime("%H:%M:%S", time.gmtime(curTime))
             clipString = f"{timeStr} {name}\n"
             desc += clipString
             # increment time and do again
@@ -214,11 +236,10 @@ class DriveAPI:
         print("Chapters generated")
         return desc
 
-
-    def initialize_upload(self, name="tempTitle", chapters=True):
+    def initialize_upload(self, name="tempTitle", playlist=None, chapters=True):
         file = "staging/__merged.MP4"
         if not os.path.exists(file):
-            exit("Missing __merged.MP4 in staging/")
+            raise Exception("Missing __merged.MP4 in staging/")
 
         # format description
         if chapters:
@@ -226,30 +247,25 @@ class DriveAPI:
         else:
             desc = "Filmspliced!"
 
-        body=dict(
-            snippet=dict(
-                title=name,
-                description=desc,
-                tags=None
-            ),
-            status=dict(
-                privacyStatus='unlisted',
-                selfDeclaredMadeForKids=False
-            )
+        body = dict(
+            snippet=dict(title=name, description=desc, tags=None),
+            status=dict(privacyStatus="unlisted", selfDeclaredMadeForKids=False),
         )
 
         # Connect to the API service
-        self.service = build('youtube', 'v3', credentials=self.creds)
+        self.service = build("youtube", "v3", credentials=self.creds)
         # Call the API's videos.insert method to create and upload the video.
-        insert_request = self.service.videos().insert(part=",".join(body.keys()),
-                                                      body=body,
-                                                      media_body=MediaFileUpload(file, chunksize=-1, resumable=True))
+        insert_request = self.service.videos().insert(
+            part=",".join(body.keys()),
+            body=body,
+            media_body=MediaFileUpload(file, chunksize=-1, resumable=True),
+        )
 
-        self.resumable_upload(insert_request, name)
+        self.resumable_upload(insert_request, name, playlist)
 
     # FROM YOUTUBE API DOCUMENTATION
     # This method implements an exponential backoff strategy to resume a failed upload.
-    def resumable_upload(self, insert_request, name):
+    def resumable_upload(self, insert_request, name, playlist):
         response = None
         error = None
         retry = 0
@@ -258,14 +274,19 @@ class DriveAPI:
                 print("Uploading file...")
                 status, response = insert_request.next_chunk()
                 if response is not None:
-                    if 'id' in response:
+                    if "id" in response:
                         print(f"Video id '{response['id']}' was successfully uploaded.")
                     else:
-                        exit("The upload failed with an unexpected response: %s" % response)
+                        exit(
+                            "The upload failed with an unexpected response: %s"
+                            % response
+                        )
             except HttpError as e:
                 if e.resp.status in RETRIABLE_STATUS_CODES:
-                    error = "A retriable HTTP error %d occurred:\n%s" % (e.resp.status,
-                                                                         e.content)
+                    error = "A retriable HTTP error %d occurred:\n%s" % (
+                        e.resp.status,
+                        e.content,
+                    )
                 else:
                     raise
             except RETRIABLE_EXCEPTIONS as e:
@@ -279,53 +300,101 @@ class DriveAPI:
 
             if not response:
                 # sleep and retry if unsuccessful
-                max_sleep = 2 ** retry
+                max_sleep = 2**retry
                 sleep_seconds = random.random() * max_sleep
                 print(f"Sleeping {sleep_seconds} seconds and then retrying...")
                 time.sleep(sleep_seconds)
 
-        if 'id' in response:
-            # success; sleep till processed and notify slack
-            self.sleep_till_processed(response['id'], name)
-
+        # On successful upload, response will contain an id
+        if "id" in response:
+            # add to designated playlist if specified
+            if playlist:
+                self.add_to_playlist(response["id"], playlist)
+            # sleep till processed and notify slack
+            self.sleep_till_processed(response["id"], name)
 
     def sleep_till_processed(self, vid_id, name):
         max_attempts = 4
         # Call the API's videos.insert method to create and upload the video.
-        request = self.service.videos().list(part="processingDetails",id=str(vid_id))
+        request = self.service.videos().list(part="processingDetails", id=str(vid_id))
         status = None
         print("Checking processing status...")
         for attempt in range(max_attempts):
-            time.sleep(5*60) # sleep 5 mins
+            time.sleep(5 * 60)  # sleep 5 mins
             response = request.execute()
-            status = response['items'][0]['processingDetails']['processingStatus']
-            if status == 'processing':
+            status = response["items"][0]["processingDetails"]["processingStatus"]
+            if status == "processing":
                 print("Still processing...")
-            elif status == 'succeeded':
+            elif status == "succeeded":
                 print("Done! Sending message to slack")
                 self.send_success_message(vid_id, name)
                 break
 
-
     def send_success_message(self, vid_id, name):
         message = f"Video '{name}' has been filmspliced! Dap up www.youtube.com/watch?v={vid_id}"
-        payload = {'text': message}
-        x = requests.post(self.slack_hook, json = payload)
+        payload = {"text": message}
+        x = requests.post(self.slack_hook, json=payload)
 
     def prompt_name(self, folderName):
-        res = wt.Whiptail(title="Name Video", height=20, width=60).inputbox(msg="Enter video title",default=folderName)
+        res = wt.Whiptail(title="Name Video", height=20, width=60).inputbox(
+            msg="Enter video title", default=folderName
+        )
         # if cancelled; exit
         if res[1]:
             sys.exit(0)
         return res[0]
 
+    def prompt_playlist(self, name):
+        # Get list of all channel playlists
+        self.service = build("youtube", "v3", credentials=self.creds)
+        playlists_request = self.service.playlists().list(
+            part="snippet",
+            mine=True,
+            maxResults=25,
+            fields="items/id,items/snippet/title",
+        )
+        response = playlists_request.execute()
+        playlists = dict()
+        for item in response.get("items"):
+            playlists[item["snippet"]["title"]] = item["id"]
+
+        menu_items = list(playlists.keys())
+        choice, response = wt.Whiptail(
+            title="Choose Playlist", height=20, width=60
+        ).menu(msg=f"Choose a playlist for '{name}'", items=menu_items)
+        if response:
+            return None
+        else:
+            return playlists.get(choice)
+
+    def add_to_playlist(self, video_id, playlist_id):
+        playlistItem = dict(
+            snippet=dict(
+                playlistId=playlist_id,
+                resourceId=dict(
+                    kind="youtube#video",
+                    videoId=video_id,
+                ),
+            )
+        )
+
+        # Connect to the API service
+        self.service = build("youtube", "v3", credentials=self.creds)
+        add_request = self.service.playlistItems().insert(
+            part=",".join(playlistItem.keys()), body=playlistItem
+        )
+        response = add_request.execute()
+        return response
+
 
 def main():
     toSplice, folderName = obj.findFolder()
     name = obj.prompt_name(folderName)
+    playlist = obj.prompt_playlist(name)
     obj.downloadFilm(toSplice)
     obj.spliceFilm()
-    obj.initialize_upload(name=name)
+    obj.initialize_upload(name=name,playlist=playlist)
+
 
 if __name__ == "__main__":
     try:
