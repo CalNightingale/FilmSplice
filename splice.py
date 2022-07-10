@@ -19,7 +19,6 @@ from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 from moviepy.editor import *
 
-from simple_term_menu import TerminalMenu
 from pyfzf.pyfzf import FzfPrompt
 import whiptail as wt
 
