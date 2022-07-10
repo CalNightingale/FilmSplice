@@ -2,8 +2,8 @@
 1. Clone this repository
 2. Create a python virtual environment. Must be python3.6 or later
 3. `pip install -r requirements.txt`
-4. Create credentials.json in filmsplice folder. Need to generate credentials as per [google's developer instructions]
-(https://developers.google.com/workspace/guides/create-credentials#oauth-client-id)
+4. Create credentials.json in filmsplice folder.
+5. Need to generate credentials as per [google's developer instructions](https://developers.google.com/workspace/guides/create-credentials#oauth-client-id)
 Contact Cal for this; he can send you the credentials
 5. Create secrets.json in filmsplice folder.
 Should look like this:
