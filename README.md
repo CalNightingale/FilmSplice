@@ -24,6 +24,8 @@ To find this, simply navigate to the folder in a web browser and examine the URL
 `python splice.py`
 
 
+# Legal/Google Stuff
+
 **Privacy Policy**
 
 Use FilmSplice at your own risk! Your google credentials are stored purely for use to authenticate using the OAuth client
