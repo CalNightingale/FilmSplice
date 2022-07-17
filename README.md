@@ -23,3 +23,14 @@ To find this, simply navigate to the folder in a web browser and examine the URL
 # To Use
 `python splice.py`
 
+
+**Privacy Policy**
+
+Use FilmSplice at your own risk! Your google credentials are stored purely for use to authenticate using the OAuth client
+so that FilmSplice can function properly. It is your responsibility to keep your `credentials.json` file safe!
+
+**Terms of Service**
+
+Only use FilmSplice as a utility to download film from google drive, stitch it together, and upload it to your personal YouTube
+channel. Any other usage of FilmSplice is prohibited.
+
