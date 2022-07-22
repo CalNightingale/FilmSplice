@@ -1,1 +1,4 @@
 theme: jekyll-theme-merlot
+title: FlimSplice
+description: Take film from google drive, stitch together, upload to YouTube
+site_favicon: favicon.ico
