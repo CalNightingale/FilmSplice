@@ -1,37 +1,25 @@
-## Welcome to GitHub Pages
+## Purpose
 
-You can use the [editor on GitHub](https://github.com/CalNightingale/filmsplice/edit/master/docs/index.md) to maintain and preview the content for your website in Markdown files.
+Many Ultimate teams ([Brown](https://www.brown.edu/Athletics/Mens_Ultimate/index.html) included) film their games and/or practices and store the footage in Google Drive.
+However, it is not ideal to watch the footage back clip by clip in the Drive video player.
+YouTube is far preferable in order to take advantage of features like playlists, chapters, and sharing links with timestamps.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+So, to facilitate this, I built FilmSplice! It works in three steps:
+1. Download footage from Google Drive
+2. Stich clips together into single .MP4 file
+3. Upload merged footage to YouTube
 
-### Markdown
+## Extra Features
+### Slack integration
+Many teams use slack to communicate.
+FilmSplice supports a slack hook as an optional parameter, and can send messages to a slack channel when film is done processing
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+### Playlists
+Teams often have separate playlists for different tournaments, seasons, or even just games/practices.
+FilmSplice allows users to select a playlist to automatically add the spliced footage to prior to uploading
 
-```markdown
-Syntax highlighted code block
+## Challenges and Takeaways
 
-# Header 1
-## Header 2
-### Header 3
-
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
-```
-
-For more details see [Basic writing and formatting syntax](https://docs.github.com/en/github/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/CalNightingale/filmsplice/settings/pages). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+The most difficult part of this project was learning how to use the Google APIs for Drive and YouTube.
+Through trial and error, I have learned a lot about how HTTP requests work and how to interface with external code.
+My python coding skills have also improved, as has my understanding of how to build and deploy websites and documentation
