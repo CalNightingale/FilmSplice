@@ -159,9 +159,6 @@ class DriveAPI:
         return parentFolder, curName
 
     def downloadFilm(self, folder_id):
-        # make dl directory if necessary
-        if not os.path.exists("staging"):
-            os.makedirs("staging")
 
         # remove existing files
         for file in os.scandir("staging"):
@@ -387,6 +384,10 @@ class DriveAPI:
 
 
 def main():
+    # make dl directory if necessary
+    if not os.path.exists("staging"):
+        os.mkdir("staging")
+
     toSplice, folderName = obj.findFolder()
     name = obj.prompt_name(folderName)
     playlist = obj.prompt_playlist(name)
