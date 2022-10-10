@@ -6,6 +6,7 @@ import os
 import time
 import json
 import random
+import subprocess
 import shutil
 import requests
 import http.client
@@ -193,22 +194,14 @@ class DriveAPI:
                 shutil.copyfileobj(fh, f)
 
     def spliceFilm(self):
-        # create list of loaded-in clips
-        clipNames = [file.name for file in os.scandir("staging")]
-        clipNames.sort()
-        clips = []
-        for clipName in clipNames:
-            vid = VideoFileClip(f"staging/{clipName}")
-            clips.append(vid)
-
-        # concatenate clips and save
-        final = concatenate_videoclips(clips)
-        final.write_videofile("staging/__merged.MP4")
+        # Splice film together, store in staging/__merged.MP4
+        subprocess.run(['sh', 'splice.sh'])
 
     def format_desc(self):
         print("Generating chapters...")
         # get names and durations
         clipNames = [file.name for file in os.scandir("staging")]
+        clipNames.remove("clips.txt")
         clipNames.sort()
         durations = []
         for clipName in clipNames:
