@@ -24,7 +24,9 @@ Check out the [slack api](https://api.slack.com/messaging/webhooks) for informat
 To find this, simply navigate to the folder in a web browser and examine the URL and find the string at the end:
 `https://drive.google.com/drive/u/1/folders/FOLDER_ID`
 
-7. Ensure the ffmpeg library is installed locally. Check if installed with `ffmpeg -version`
+7. Ensure the following libraries are installed locally: 
+* ffmpeg (check with `ffmpeg -version`)
+* whiptail (check with `whiptail -version`). If on mac, install with `brew install newt`
 
 # To Use
 `python splice.py`
