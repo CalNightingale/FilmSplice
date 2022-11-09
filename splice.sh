@@ -1,5 +1,6 @@
 #!/bin/sh
 
+
 # Create list of all clips to splice
 ls -1 staging | sed 's/^/file /' >> clips.txt
 

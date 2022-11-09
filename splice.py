@@ -51,6 +51,7 @@ RETRIABLE_EXCEPTIONS = (
 RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
 ################################################################################
 FZF_ARGS = "--margin 1,7 --border --tiebreak=begin --color fg:252,bg:237,hl:11,fg+:238,bg+:139,hl+:0 --color info:108,prompt:109,spinner:108,pointer:168,marker:168"
+DISK_USAGE_THRESHOLD = 0.8
 
 
 class DriveAPI:
@@ -194,6 +195,12 @@ class DriveAPI:
                 shutil.copyfileobj(fh, f)
 
     def spliceFilm(self):
+        # check if there is enough space on disk
+        merged_size = sum([file.stat().st_size for file in os.scandir('staging')])
+        available_space = shutil.disk_usage('staging').free * DISK_USAGE_THRESHOLD
+        if merged_size > available_space:
+            print("Cannot splice! Not enough space available on disk")
+            sys.exit(1)
         # Splice film together, store in staging/__merged.MP4
         subprocess.run(['sh', 'splice.sh'])
 
