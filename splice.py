@@ -204,12 +204,19 @@ class DriveAPI:
         # Splice film together, store in staging/__merged.MP4
         subprocess.run(['sh', 'splice.sh'])
 
+    def get_clips(self):
+        clips = []
+        for file in os.scandir("staging"):
+            if file.name[-3:] == "MP4" and file.name != "__merged.MP4":
+                clips.append(file.name)
+        clips.sort()
+        print(clips)
+        return clips
+
     def format_desc(self):
         print("Generating chapters...")
         # get names and durations
-        clipNames = [file.name for file in os.scandir("staging")]
-        clipNames.remove("clips.txt")
-        clipNames.sort()
+        clipNames = self.get_clips()
         durations = []
         for clipName in clipNames:
             vid = VideoFileClip(f"staging/{clipName}")
@@ -327,7 +334,7 @@ class DriveAPI:
                 break
 
     def send_success_message(self, vid_id, name):
-        message = f"Video '{name}' has been filmspliced! Dap up www.youtube.com/watch?v={vid_id}"
+        message = f"Video '{name}' has been filmspliced! Don't leave me hanging, dap up www.youtube.com/watch?v={vid_id}"
         payload = {"text": message}
         x = requests.post(self.slack_hook, json=payload)
 
