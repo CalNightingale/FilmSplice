@@ -21,6 +21,8 @@ from moviepy.editor import VideoFileClip, concatenate_videoclips
 
 from simple_term_menu import TerminalMenu
 import concurrent.futures
+import socket
+socket.setdefaulttimeout(360)
 
 ################################################################################
 # YOUTUBE STUFF
@@ -30,7 +32,7 @@ import concurrent.futures
 httplib2.RETRIES = 1
 
 # Maximum number of times to retry before giving up.
-MAX_RETRIES = 10
+MAX_RETRIES = 300
 
 # Always retry when these exceptions are raised.
 RETRIABLE_EXCEPTIONS = (httplib2.HttpLib2Error, IOError, http.client.NotConnected,
@@ -174,7 +176,7 @@ class DriveAPI:
                 shutil.copyfileobj(fh, f)
 
     def get_clip_names(self):
-        clipNames = [file.name for file in os.scandir("staging") if '.DS_Store' not in file.name]
+        clipNames = [file.name for file in os.scandir("staging") if '.DS_Store' not in file.name and '.pkl' not in file.name]
         clipNames.sort()
         return clipNames
 
@@ -222,6 +224,8 @@ class DriveAPI:
 
 
     def initialize_upload(self, name="tempTitle", chapters=True):
+        self.RESUMABLE_URI_FILE = f"staging/{name}_resumable_uri.pkl"
+        self.RESUMABLE_PROGRESS_FILE = f"staging/{name}_resumable_progress.pkl"
         file = "staging/__merged.MP4"
         if not os.path.exists(file):
             exit("Missing __merged.MP4 in staging/")
@@ -246,23 +250,48 @@ class DriveAPI:
 
         # Connect to the API service
         self.service = build('youtube', 'v3', credentials=self.creds)
+        media_body = MediaFileUpload(file, chunksize=-1, resumable=True)
         # Call the API's videos.insert method to create and upload the video.
         insert_request = self.service.videos().insert(part=",".join(body.keys()),
                                                       body=body,
-                                                      media_body=MediaFileUpload(file, chunksize=-1, resumable=True))
+                                                      media_body=media_body)
+        upload_size_bytes = media_body._size
+        resume_upload_point_data = self.load_resume_upload_point()
+        if resume_upload_point_data:
+            insert_request.resumable_uri, insert_request.resumable_progress = resume_upload_point_data
+            print(f"Progress starting at {100.0*insert_request.resumable_progress/upload_size_bytes:.2f}%")
+        self.resumable_upload(insert_request, name, upload_size_bytes)
 
-        self.resumable_upload(insert_request, name)
+## This doesn't seem to work right now - repeated socket timeouts for whatever reason
+    def save_resume_upload_point(self, resumable_uri, resumable_progress):
+        with open(self.RESUMABLE_URI_FILE, 'wb') as uri_file:
+            pickle.dump(resumable_uri, uri_file)
+        with open(self.RESUMABLE_PROGRESS_FILE, 'wb') as progress_file:
+            pickle.dump(resumable_progress, progress_file)
+
+    def load_resume_upload_point(self):
+        try:
+            with open(self.RESUMABLE_URI_FILE, 'rb') as uri_file:
+                resumable_uri = pickle.load(uri_file)
+            with open(self.RESUMABLE_PROGRESS_FILE, 'rb') as progress_file:
+                resumable_progress = pickle.load(progress_file)
+            return resumable_uri, resumable_progress
+        except FileNotFoundError as f:
+            print(f"No resumable upload found at {self.RESUMABLE_URI_FILE} - starting fresh")
 
     # FROM YOUTUBE API DOCUMENTATION
     # This method implements an exponential backoff strategy to resume a failed upload.
-    def resumable_upload(self, insert_request, name):
+    def resumable_upload(self, insert_request, name, upload_size_bytes):
         response = None
         error = None
         retry = 0
+        last_sleep = time.time()
+        sleep_seconds = 0
         while response is None:
             try:
                 print("Uploading file...")
                 status, response = insert_request.next_chunk()
+                self.save_resume_upload_point(insert_request.resumable_uri, insert_request.resumable_progress)
                 if response is not None:
                     if 'id' in response:
                         print(f"Video id '{response['id']}' was successfully uploaded.")
@@ -271,24 +300,30 @@ class DriveAPI:
             except HttpError as e:
                 if e.resp.status in RETRIABLE_STATUS_CODES:
                     error = "A retriable HTTP error %d occurred:\n%s" % (e.resp.status,
-                                                                         e.content)
+                                                                            e.content)
                 else:
                     raise
             except RETRIABLE_EXCEPTIONS as e:
-                error = "A retriable error occurred: %s" % e
-
+                error = f"A retriable error occurred: {e} with type {type(e)}"
+            finally:
+                self.save_resume_upload_point(insert_request.resumable_uri, insert_request.resumable_progress)
             if error is not None:
                 print(error)
                 retry += 1
             if retry > MAX_RETRIES:
                 exit("No longer attempting to retry.")
-
             if not response:
                 # sleep and retry if unsuccessful
-                max_sleep = 2 ** retry
+                now = time.time()
+                if last_sleep - now > 30 + sleep_seconds:
+                    # If upload gets back on track don't let periodic retries tank it
+                    retry = 0
+                max_sleep = 1.3 ** retry
                 sleep_seconds = random.random() * max_sleep
+                print(f"File progress: {100.0*insert_request.resumable_progress/upload_size_bytes:.2f}%")
                 print(f"Sleeping {sleep_seconds} seconds and then retrying...")
                 time.sleep(sleep_seconds)
+                last_sleep = time.time()
 
         if 'id' in response:
             # success; sleep till processed and notify slack
