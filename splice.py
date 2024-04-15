@@ -427,7 +427,7 @@ def execute_splice(obj):
         if not filmpath:
             sys.exit(1)
         # ask user for name
-        name = obj.prompt_name(filmpath)
+        name = obj.prompt_name(filmpath.split('/')[-1])
         # ask user for playlist
         playlist = obj.prompt_playlist(name)
         # splice it
