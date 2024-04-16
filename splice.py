@@ -80,7 +80,7 @@ def prompt_fileloc():
     return choice
 
 # Execute splice from scratch
-def execute_splice(obj):
+def execute_splice(obj: DriveAPI):
     # make dl directory if necessary
     if not os.path.exists("staging"):
         os.mkdir("staging")
@@ -90,13 +90,13 @@ def execute_splice(obj):
         # locate google drive folder
         toSplice, folderName = obj.findFolder()
         # ask user for name
-        name = obj.prompt_name(folderName)
+        name = prompt_name(folderName)
         # ask user for playlist
         playlist = obj.prompt_playlist(name)
         # download film from drive
         obj.downloadFilm(toSplice)
         # splice it
-        obj.spliceFilm()
+        spliceFilm()
         # begin upload
         obj.initialize_upload(name=name,playlist=playlist)
     elif fileloc == "Local":
@@ -105,11 +105,11 @@ def execute_splice(obj):
         if not filmpath:
             sys.exit(1)
         # ask user for name
-        name = obj.prompt_name(filmpath.split('/')[-1])
+        name = prompt_name(filmpath.split('/')[-1])
         # ask user for playlist
         playlist = obj.prompt_playlist(name)
         # splice it
-        obj.spliceFilm(filmpath=filmpath)
+        spliceFilm(filmpath=filmpath)
         # begin upload
         obj.initialize_upload(name=name,playlist=playlist)
     else:
@@ -135,7 +135,7 @@ def main():
         if len(existingFiles) == 0:
             print("No files found in staging! Cannot resume splice")
             exit()
-        obj.spliceFilm()
+        spliceFilm()
         obj.initialize_upload()
     elif user_selection == "retry upload":
         # resume upload
