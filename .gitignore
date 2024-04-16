@@ -5,4 +5,6 @@ token.pickle
 # folders and venvs
 staging
 spliceenv
+env_splice
 __pycache__
+.DS_Store
