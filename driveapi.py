@@ -21,6 +21,7 @@ from pyfzf.pyfzf import FzfPrompt
 from tqdm import tqdm
 import whiptail as wt
 
+import utils
 
 ################################################################################
 # YOUTUBE STUFF
@@ -205,7 +206,7 @@ class DriveAPI:
 
         # format description
         if chapters:
-            desc = self.format_desc()
+            desc = utils.format_desc()
         else:
             desc = "Filmspliced!"
 
@@ -228,6 +229,7 @@ class DriveAPI:
     # FROM YOUTUBE API DOCUMENTATION
     # This method implements an exponential backoff strategy to resume a failed upload.
     def resumable_upload(self, insert_request, name, playlist):
+        print("Starting upload...")
         response = None
         error = None
         retry = 0
@@ -236,17 +238,21 @@ class DriveAPI:
 
         while response is None:
             try:
-                print("Uploading file...")
-                status, response = insert_request.next_chunk()
-                # update progress bar
-                if status:
-                    progress_bar.update(int(status.progress() * 100) - progress_bar.n)
+                import pudb; pu.db
+                pct_done = 0
+                while pct_done < 100:
+                    status, response = insert_request.next_chunk()
+                    # update progress bar
+                    if status:
+                        pct_done = int(status.progress() * 100)
+                        progress_bar.update(pct_done - progress_bar.n)
+                    if response is not None and "id" not in response:
+                        exit(f"The upload failed with an unexpected response:\n{response}")
                 # handle upload completion
                 if response is not None:
                     if "id" in response:
                         print(f"Video id '{response['id']}' was successfully uploaded.")
-                    else:
-                        exit(f"The upload failed with an unexpected response:\n{response}")
+                    
             except HttpError as e:
                 if e.resp.status in RETRIABLE_STATUS_CODES:
                     error = "A retriable HTTP error %d occurred:\n%s" % (

@@ -1,12 +1,11 @@
 from __future__ import print_function
 import os.path
 import os
-import time
 import subprocess
 import shutil
 from google.auth.exceptions import RefreshError
-from moviepy.editor import *
 import whiptail as wt
+import sys
 
 from tkinter.filedialog import askdirectory
 
@@ -25,40 +24,6 @@ def spliceFilm(filmpath=f'{os.getcwd()}/staging'):
     # Splice film together, store in staging/__merged.MP4
     subprocess.run(['sh', 'splice.sh', filmpath])
 
-def get_clips():
-    clips = []
-    for file in os.scandir("staging"):
-        if file.name[-3:] == "MP4" and file.name != "__merged.MP4":
-            clips.append(file.name)
-    clips.sort()
-    print(clips)
-    return clips
-
-def format_desc():
-    print("Generating chapters...")
-    # get names and durations
-    clipNames = get_clips()
-    durations = []
-    for clipName in clipNames:
-        vid = VideoFileClip(f"staging/{clipName}")
-        durations.append(vid.duration)
-        del vid
-
-    # generate formatted string
-    desc = "Filmspliced! Clips:\n\n"
-    curTime = 0
-    for name, dur in zip(clipNames, durations):
-        if name == "__merged.MP4":
-            # skip merged if it exists
-            continue
-        # format time for use in YouTube auto-chapter generation
-        timeStr = time.strftime("%H:%M:%S", time.gmtime(curTime))
-        clipString = f"{timeStr} {name}\n"
-        desc += clipString
-        # increment time and do again
-        curTime += dur
-    print("Chapters generated")
-    return desc
 
 
 def prompt_name(folderName):
