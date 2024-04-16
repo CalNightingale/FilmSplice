@@ -18,6 +18,7 @@ from googleapiclient.errors import HttpError
 from moviepy.editor import *
 
 from pyfzf.pyfzf import FzfPrompt
+from tqdm import tqdm
 import whiptail as wt
 
 
@@ -157,11 +158,12 @@ class DriveAPI:
         return parentFolder, curName
 
     def downloadFilm(self, folder_id):
-
+        print("Downloading clips from drive...")
         # remove existing files
         for file in os.scandir("staging"):
             os.remove(file.path)
 
+        # get files to download
         self.service = build("drive", "v3", credentials=self.creds)
         results = (
             self.service.files()
@@ -172,23 +174,30 @@ class DriveAPI:
         )
         files = results.get("files", [])
 
+        # download each file
         for file in files:
-            print(f"Downloading {file.get('name')}...")
+            # initialize download
+            file_name = file.get('name')
             file_id = file.get("id")
-            dl_path = f"staging/{file.get('name')}"
-            print("begin")
+            dl_path = f"staging/{file_name}"
             request = self.service.files().get_media(fileId=file_id)
             fh = io.BytesIO()
             downloader = MediaIoBaseDownload(fh, request)
             done = False
-            while done is False:
-                status, done = downloader.next_chunk()
-                print("Download %d%%." % int(status.progress() * 100))
 
+            # execute (with progress bar)
+            with tqdm(total=100, unit='%', unit_scale=True, desc=file_name, leave=True,
+                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {elapsed}<{remaining}") as pbar:
+                while done is False:
+                    status, done = downloader.next_chunk()
+                    pbar.update(int(status.progress() * 100) - pbar.n)
+
+            # write the received data to file
             fh.seek(0)
-            # Write the received data to the file
             with open(dl_path, "wb") as f:
                 shutil.copyfileobj(fh, f)
+        print("All clips downloaded")
+
     def initialize_upload(self, name="tempTitle", playlist=None, chapters=True):
         file = "staging/__merged.MP4"
         if not os.path.exists(file):
