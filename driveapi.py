@@ -231,18 +231,22 @@ class DriveAPI:
         response = None
         error = None
         retry = 0
+        progress_bar = tqdm(total=100, unit='%', desc=f"Uploading {name}", leave=True,
+                            bar_format="{desc}: {percentage:3.0f}%|{bar}| {elapsed}<{remaining}")
+
         while response is None:
             try:
                 print("Uploading file...")
                 status, response = insert_request.next_chunk()
+                # update progress bar
+                if status:
+                    progress_bar.update(int(status.progress() * 100) - progress_bar.n)
+                # handle upload completion
                 if response is not None:
                     if "id" in response:
                         print(f"Video id '{response['id']}' was successfully uploaded.")
                     else:
-                        exit(
-                            "The upload failed with an unexpected response: %s"
-                            % response
-                        )
+                        exit(f"The upload failed with an unexpected response:\n{response}")
             except HttpError as e:
                 if e.resp.status in RETRIABLE_STATUS_CODES:
                     error = "A retriable HTTP error %d occurred:\n%s" % (
