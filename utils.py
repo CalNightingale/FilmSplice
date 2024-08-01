@@ -3,6 +3,7 @@ import subprocess
 import re
 import sys
 import time
+import tempfile
 
 # Return clip duration in seconds
 def get_clip_duration(clip_name: str) -> int:
@@ -22,6 +23,7 @@ def get_clip_duration(clip_name: str) -> int:
     print("Duration not found")
     sys.exit(1)
 
+# Get all of the clip names in the staging directory
 def get_clips():
     clips = []
     for file in os.scandir("staging"):
@@ -30,6 +32,7 @@ def get_clips():
     clips.sort()
     return clips
 
+# Generate youtube video description
 def format_desc(print_desc=False):
     print("Generating chapters...")
     # get names and durations
@@ -56,3 +59,43 @@ def format_desc(print_desc=False):
     if print_desc:
         print(desc)
     return desc
+
+
+def execute_splice(directory):
+    # Check if directory exists
+    if not os.path.isdir(directory):
+        print(f"Error: Directory '{directory}' does not exist.")
+        sys.exit(1)
+
+    # Get list of video files in the directory
+    video_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    video_files.sort()  # Sort the files alphanumerically
+
+    # Prepare the input for ffmpeg
+    input_list = [f"file '{os.path.abspath(os.path.join(directory, f))}'" for f in video_files]
+    input_text = "\n".join(input_list)
+
+    # Create a temporary file for ffmpeg input
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+        temp_file.write(input_text)
+        temp_file_path = temp_file.name
+
+    # Prepare the ffmpeg command
+    ffmpeg_command = [
+        "ffmpeg",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", temp_file_path,
+        "-c", "copy",
+        "staging/__merged.MP4"
+    ]
+
+    # Execute ffmpeg command
+    try:
+        subprocess.run(ffmpeg_command, check=True)
+        print("Video concatenation completed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during video concatenation: {e}")
+    finally:
+        # Clean up temporary file
+        os.unlink(temp_file_path)

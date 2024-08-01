@@ -6,6 +6,7 @@ import shutil
 from google.auth.exceptions import RefreshError
 import whiptail as wt
 import sys
+import utils
 
 from tkinter.filedialog import askdirectory
 
@@ -22,8 +23,7 @@ def spliceFilm(filmpath=f'{os.getcwd()}/staging'):
         print(f"Cannot splice! Not enough space available on disk (need {merged_size}, {available_space} available)")
         sys.exit(1)
     # Splice film together, store in staging/__merged.MP4
-    subprocess.run(['sh', 'splice.sh', filmpath])
-
+    utils.execute_splice(filmpath)
 
 
 def prompt_name(folderName):
