@@ -4,6 +4,7 @@ import re
 import sys
 import time
 import tempfile
+import mimetypes
 
 # Return clip duration in seconds
 def get_clip_duration(clip_name: str) -> int:
@@ -60,15 +61,32 @@ def format_desc(print_desc=False):
         print(desc)
     return desc
 
+def is_video_file(file_path):
+    mime_type, _ = mimetypes.guess_type(file_path)
+    return mime_type and mime_type.startswith('video/')
 
+# Actually execute splicing of clips using ffmpeg
 def execute_splice(directory):
     # Check if directory exists
     if not os.path.isdir(directory):
         print(f"Error: Directory '{directory}' does not exist.")
         sys.exit(1)
 
-    # Get list of video files in the directory
-    video_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    # Get list of all files in the directory
+    all_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+
+    # Check if all files are video files
+    video_files = []
+    for file in all_files:
+        file_path = os.path.join(directory, file)
+        if is_video_file(file_path):
+            video_files.append(file)
+        else:
+            print(f"Warning: '{file}' is not a video file and will be skipped.")
+
+    if not video_files:
+        print("Error: No video files found in the directory.")
+        sys.exit(1)
     video_files.sort()  # Sort the files alphanumerically
 
     # Prepare the input for ffmpeg
